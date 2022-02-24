@@ -1,0 +1,32 @@
+version: "3"
+
+services:
+  mlflow:
+    build: .
+    volumes:
+      - ./db:/db
+    ports:
+      - 5000:5000
+    networks:
+      deploy_network:
+    container_name: mlflow_random_forest
+
+  fastapi:
+    build:
+      context: ./
+      dockerfile: ./api/Dockerfile
+    volumes:
+      - ./db:/db
+    depends_on:
+      - mlflow
+    ports:
+      - 8000:8000
+    networks:
+      deploy_network:
+    container_name: fastapi_random_forest
+
+networks:
+  deploy_network:
+    driver: bridge
+    # external:
+    #   name: net-name
