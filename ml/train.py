@@ -29,7 +29,7 @@ class RandomForestClassifiers(BaseEstimator):
         self.y = self.df['default']
         
         #handle exceptions
-        super().train(self.X, self.y)
+        super().fit(self.X, self.y)
         self.X_Train, self.X_Test, self.Y_Train, self.Y_Test = train_test_split(self.X, self.y, test_size = test_size, random_state = 0)
      
     

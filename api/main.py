@@ -1,4 +1,4 @@
-from fastapi import FastAPI,UploadFile
+from fastapi import FastAPI, UploadFile, status, HTTPException
 from fastapi import BackgroundTasks
 import mlflow 
 import pandas as pd
@@ -59,17 +59,17 @@ def train_model_task(model_name: str = Query(None, description="type model_name 
             mlflowclient.transition_model_version_stage( name=mv.name, version=mv.version, stage="production")   
          
     except Exception as e:
-        print('Error in model training')
-        print('ExceptionStackTrace: {0}'.format(e))
         raise e
 
 
-@app.post("/train")
+@app.post("/train", status_code=status.HTTP_201_CREATED)
 async def train_api(model_name : str, trainFile: UploadFile, background_tasks: BackgroundTasks):
-   background_tasks.add_task(train_model_task, model_name, trainFile)
-   id = uuid.uuid4()
-   startTime = time.time()
-   return {'id': id,'result':'training started', 'startTime': startTime}
+   try: 
+       background_tasks.add_task(train_model_task, model_name, trainFile)
+       return {'id': uuid.uuid4(),'result':'training started', 'startTime': time.time()}
+    
+   except Exception as e:
+        raise HTTPException(status_code=500, detail='Unexpected error while executing model {0}'.format(e))
 
 
 "predict (data_inference, modelname)"
@@ -80,26 +80,32 @@ async def train_api(model_name : str, trainFile: UploadFile, background_tasks: B
 
 @app.post('/predict')
 async def predict_api(model_name : str,  customerFile: UploadFile):
-    #Pick model from registry
-    model = mlflow.sklearn.load_model(
-        model_uri=f"models:/{model_name}/Production"
-    )
-    #load data
-    data = pd.read_csv(customerFile.file)
-    #Predict
-    res = model.predict(data)
-    data['default'] = res.tolist()
-    #transform dataframe to csv file column
-    stream = io.StringIO()
-    data.to_csv(stream, index = False)
-    response = StreamingResponse(iter([stream.getvalue()]),
+    try:
+        #Pick model from registry
+        model = mlflow.sklearn.load_model(
+            model_uri=f"models:/{model_name}/Production"
+        )
+        if model is None:
+            raise HTTPException(status_code=404, detail='No Model registered in given name {0}'.format(model_name))
+        #load data
+        data = pd.read_csv(customerFile.file)
+        #Predict
+        res = model.predict(data)
+        data['default'] = res.tolist()
+        #transform dataframe to csv file column
+        stream = io.StringIO()
+        data.to_csv(stream, index = False)
+        response = StreamingResponse(iter([stream.getvalue()]),
                             media_type="text/csv")
    
-    # tests model with hardcoded values
-    #print("test:",model.predict([[9803,77,100,1,0,3,17.237973957712,8,76.3751272014125]]))
+        # tests model with hardcoded values
+        #print("test:",model.predict([[9803,77,100,1,0,3,17.237973957712,8,76.3751272014125]]))
     
-    response.headers["Content-Disposition"] = "attachment; filename=loan-default.csv"
-    return response
+        response.headers["Content-Disposition"] = "attachment; filename=loan-default.csv"
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail='Unexpected error while executing model {0}'.format(e))
+
     
 
 "API : to load model from ml flow"
@@ -108,6 +114,9 @@ async def predict_api(model_name : str,  customerFile: UploadFile):
 @app.get('/models')
 async def get_models():
     # Read models from mlflow registry
-    models = mlflowclient.list_registered_models()
-    models = [model.name for model in models]
-    return models
+    try:
+        models = mlflowclient.list_registered_models()
+        models = [model.name for model in models]
+        return models
+    except Exception as e:
+        raise HTTPException(status_code=500, detail='Unexpected error while executing model {0}'.format(e))
