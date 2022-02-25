@@ -36,10 +36,14 @@ class RandomForestClassifiers(BaseEstimator):
     def fit(self):
         # Fitting the classifier into the Training set
         model = self.random_for.fit(self.X_Train,self.Y_Train)
-        y_predictions = model.predict(self.X_Test)
+        self.predict(model, self.X_Test)
+        return model
+
+    def predict(self, model, X):
+        y_predictions = model.predict(X)
         #accuracy and graph calculation
         self.metrics(y_predictions)
-        return model
+        return y_predictions    
         
     def metrics(self, y_predictions):    
         print("Accuracy:", accuracy_score(self.Y_Test, y_predictions))
