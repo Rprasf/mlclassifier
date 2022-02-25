@@ -61,7 +61,6 @@ def train_model_task(model_name: str = Query(None, description="type model_name 
     except Exception as e:
         raise e
 
-
 @app.post("/train", status_code=status.HTTP_201_CREATED)
 async def train_api(model_name : str, trainFile: UploadFile, background_tasks: BackgroundTasks):
    try: 
